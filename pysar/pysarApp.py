@@ -17,11 +17,11 @@ import shutil
 import argparse
 import subprocess
 import numpy as np
+import pysar
 from pysar.objects import sensor, RAMP_LIST
 from pysar.utils import readfile, utils as ut
 from pysar.defaults.auto_path import autoPath
 from pysar import version
-from pysar import load_data
 
 
 ##########################################################################
@@ -330,8 +330,8 @@ class TimeSeriesAnalysis:
         if self.projectName:
             load_data_args += ' --project {}'.format(self.projectName)
         # run
-        print(load_data_args)
-        load_data.main(load_data_args)
+        print("load_data.py ", load_data_args)
+        pysar.load_data.main(load_data_args)
         os.chdir(self.workDir)
 
         # 3) check loading result
@@ -388,39 +388,36 @@ class TimeSeriesAnalysis:
         coh_file = 'avgSpatialCoh.h5'
 
         # 1) generate mask file from the common connected components
-        cmd = 'generate_mask.py {} --nonzero -o {} --update'.format(stack_file, cc_mask_file)
-        print(cmd)
-        subprocess.Popen(cmd, shell=True).wait()
+        generate_mask_args = '{} --nonzero -o {} --update'.format(stack_file, cc_mask_file)
+        print('generate_mask.py ', generate_mask_args)
+        pysar.generate_mask.main(generate_mask_args)
 
         # 2.1) generate average spatial coherence
-        cmd = 'temporal_average.py {} --dataset coherence -o {} --update'.format(stack_file, coh_file)
-        print(cmd)
-        subprocess.Popen(cmd, shell=True).wait()
+        temporal_average_args = '{} --dataset coherence -o {} --update'.format(stack_file, coh_file)
+        print('temporal_average.py ', temporal_average_args)
+        pysar.temporal_average.main(temporal_average_args)
 
         # 2.2) generate mask based on average spatial coherence
         if ut.run_or_skip(out_file=coh_mask_file, in_file=coh_file) == 'run':
-            cmd = 'generate_mask.py {} -m 0.7 -o {}'.format(coh_file, coh_mask_file)
+            generate_mask_args = '{} -m 0.7 -o {}'.format(coh_file, coh_mask_file)
             if os.path.isfile(water_mask_file):
-                cmd += ' --base {}'.format(water_mask_file)
-            print(cmd)
-            subprocess.Popen(cmd, shell=True).wait()
+                generate_mask_args += ' --base {}'.format(water_mask_file)
+            print('generate_mask.py ', generate_mask_args)
+            pysar.generate_mask.main(generate_mask_args)
 
         # 3) select reference point
-        cmd = 'reference_point.py {} -t {} -c {}'.format(stack_file, self.templateFile, coh_file)
-        print(cmd)
-        status = subprocess.Popen(cmd, shell=True).wait()
-        return status
-
+        reference_point_args = '{} -t {} -c {}'.format(stack_file, self.templateFile, coh_file)
+        print('reference_point.py ', reference_point_args)
+        pysar.reference_point.main(reference_point_args)
 
     def run_ifgram_stacking(self, step_name):
         """Traditional interferograms stacking."""
         # check the existence of ifgramStack.h5
         stack_file = ut.check_loaded_dataset(self.workDir, print_msg=False)[1]
         pha_vel_file = 'avgPhaseVelocity.h5'
-        cmd = 'temporal_average.py {} --dataset unwrapPhase -o {} --update'.format(stack_file, pha_vel_file)
-        print(cmd)
-        status = subprocess.Popen(cmd, shell=True).wait()
-        return status
+        temporal_average_args = '{} --dataset unwrapPhase -o {} --update'.format(stack_file, pha_vel_file)
+        print('temporal_average.py ', temporal_average_args)
+        pysar.temporal_average.main(temporal_average_args)
 
 
     def run_unwrap_error_correction(self, step_name):
@@ -435,22 +432,20 @@ class TimeSeriesAnalysis:
         stack_file = ut.check_loaded_dataset(self.workDir, print_msg=False)[1]
         mask_file = 'maskConnComp.h5'
 
-        cmd1 = 'unwrap_error_bridging.py {} -t {} --update'.format(stack_file, self.templateFile)
-        cmd2 = 'unwrap_error_phase_closure.py {} {} -t {} --update'.format(stack_file, mask_file, self.templateFile)
+        unwrap_error_bridging_args = '{} -t {} --update'.format(stack_file, self.templateFile)
+        unwrap_error_phase_closure_args = '{} {} -t {} --update'.format(stack_file, mask_file, self.templateFile)
 
         if method == 'bridging':
-            cmd = cmd1
+            pysar.unwrap_error_bridging.main(unwrap_error_bridging_args)
         elif method == 'phase_closure':
-            cmd = cmd2
+            pysar.unwrap_error_phase_closure.main(unwrap_error_phase_closure_args)
         elif method == 'bridging+phase_closure':
-            cmd = cmd1 + ' -i unwrapPhase -o unwrapPhase_bridging\n'
-            cmd += cmd2 + ' -i unwrapPhase_bridging -o unwrapPhase_bridging_phaseClosure'
+            pysar.unwrap_error_bridging.main(unwrap_error_bridging_args +
+                                             ' -i unwrapPhase -o unwrapPhase_bridging')
+            pysar.unwrap_error_phase_closure.main(unwrap_error_phase_closure_args +
+                                             ' -i unwrapPhase_bridging -o unwrapPhase_bridging_phaseClosure')
         else:
             raise ValueError('un-recognized method: {}'.format(method))
-
-        print(cmd)
-        status = subprocess.Popen(cmd, shell=True).wait()
-        return status
 
 
     def run_network_modification(self, step_name):
@@ -464,18 +459,17 @@ class TimeSeriesAnalysis:
             net_fig = None
 
         # 1) modify network
-        cmd = 'modify_network.py {} -t {}'.format(stack_file, self.templateFile)
-        print(cmd)
-        status = subprocess.Popen(cmd, shell=True).wait()
+        modify_network_args = '{} -t {}'.format(stack_file, self.templateFile)
+        print('modify_network.py ', modify_network_args)
+        pysar.modify_network.main(modify_network_args)
 
         # 2) plot network
-        cmd = 'plot_network.py {} -t {} --nodisplay'.format(stack_file, self.templateFile)
-        print('\n'+cmd)
+        plot_network_args = '{} -t {} --nodisplay'.format(stack_file, self.templateFile)
+        print('\n plot_network.py ', plot_network_args)
         if ut.run_or_skip(out_file=net_fig,
                           in_file=[stack_file, coh_txt, self.templateFile],
                           check_readable=False) == 'run':
-            subprocess.Popen(cmd, shell=True).wait()
-        return status
+            pysar.plot_network.main(plot_network_args)
 
 
     def run_network_inversion(self, step_name):
@@ -487,13 +481,12 @@ class TimeSeriesAnalysis:
         stack_file = ut.check_loaded_dataset(self.workDir, print_msg=False)[1]
 
         # 1) invert ifgramStack for time-series
-        cmd = 'ifgram_inversion.py {} -t {} --update '.format(stack_file, self.templateFile)
-        print(cmd)
-        status = subprocess.Popen(cmd, shell=True).wait()
+        ifgram_inversion_args = '{} -t {} --update '.format(stack_file, self.templateFile)
+        print('ifgram_inversion.py ', ifgram_inversion_args)
+        pysar.ifgram_inversion.main(ifgram_inversion_args)
 
         # 2) get reliable pixel mask: maskTempCoh.h5
         self.generate_temporal_coherence_mask()
-        return status
 
 
     def generate_temporal_coherence_mask(self):
@@ -503,8 +496,8 @@ class TimeSeriesAnalysis:
         mask_file = 'maskTempCoh.h5'
         tcoh_min = self.template['pysar.networkInversion.minTempCoh']
 
-        cmd = 'generate_mask.py {} -m {} -o {} --shadow {}'.format(tcoh_file, tcoh_min, mask_file, geom_file)
-        print(cmd)
+        generate_mask_args = '{} -m {} -o {} --shadow {}'.format(tcoh_file, tcoh_min, mask_file, geom_file)
+        print('generate_mask.py ', generate_mask_args)
 
         # update mode: run only if:
         # 1) output file exists and newer than input file, AND
@@ -525,7 +518,7 @@ class TimeSeriesAnalysis:
         print('run or skip: {}'.format(flag))
 
         if flag == 'run':
-            subprocess.Popen(cmd, shell=True).wait()
+            pysar.generate_mask.main(generate_mask_args)
             # update configKeys
             atr = {}
             for key in config_keys:
@@ -627,21 +620,19 @@ class TimeSeriesAnalysis:
         Automatically applied for Envisat data.
         Automatically skipped for all the other data.
         """
-        status = 0
         geom_file = ut.check_loaded_dataset(self.workDir, print_msg=False)[2]
         fnames = self.get_timeseries_filename(self.template)[step_name]
         in_file = fnames['input']
         out_file = fnames['output']
         if in_file != out_file:
-            cmd = 'local_oscilator_drift.py {} {} -o {}'.format(in_file, geom_file, out_file)
-            print(cmd)
+            local_oscilator_drift_args = '{} {} -o {}'.format(in_file, geom_file, out_file)
+            print('local_oscilator_drift.py ', local_oscilator_drift_args)
             if ut.run_or_skip(out_file=out_file, in_file=in_file) == 'run':
-                status = subprocess.Popen(cmd, shell=True).wait()
+                pysar.local_oscilator_drift.main(local_oscilator_drift_args)
         else:
             atr = readfile.read_attribute(in_file)
             sat = atr.get('PLATFORM', None)
             print('No local oscillator drift correction is needed for {}'.format(sat))
-        return status
 
 
     def run_tropospheric_delay_correction(self, step_name):
@@ -661,15 +652,15 @@ class TimeSeriesAnalysis:
 
             # Phase/Elevation Ratio (Doin et al., 2009)
             if method == 'height_correlation':
-                cmd = 'tropo_phase_elevation.py {f} -g {g} -p {p} -m {m} -o {o}'.format(f=in_file,
+                tropo_phase_elevation_args = '{f} -g {g} -p {p} -m {m} -o {o}'.format(f=in_file,
                                                                                         g=geom_file,
                                                                                         p=poly_order,
                                                                                         m=mask_file,
                                                                                         o=out_file)
                 print('tropospheric delay correction with height-correlation approach')
-                print(cmd)
+                print('tropo_phase_elevation.py ', tropo_phase_elevation_args)
                 if ut.run_or_skip(out_file=out_file, in_file=in_file) == 'run':
-                    status = subprocess.Popen(cmd, shell=True).wait()
+                    pysar.tropo_phase_elevation.main(tropo_phase_elevation_args)
 
             # Weather Re-analysis Data (Jolivet et al., 2011;2014)
             elif method == 'pyaps':
@@ -713,10 +704,10 @@ class TimeSeriesAnalysis:
         status = 0
         if in_file != out_file:
             print('Remove for each acquisition a phase ramp: {}'.format(method))
-            cmd = 'remove_ramp.py {f} -s {s} -m {m} -o {o}'.format(f=in_file, s=method, m=mask_file, o=out_file)
-            print(cmd)
+            remove_ramp_args = '{f} -s {s} -m {m} -o {o}'.format(f=in_file, s=method, m=mask_file, o=out_file)
+            print('remove_ramp.py ', remove_ramp_args)
             if ut.run_or_skip(out_file=out_file, in_file=in_file) == 'run':
-                status = subprocess.Popen(cmd, shell=True).wait()
+                pysar.remove_ramp.main(remove_ramp_args)
         else:
             print('No phase ramp removal.')
         return status
@@ -732,12 +723,12 @@ class TimeSeriesAnalysis:
         out_file = fnames['output']
         status = 0
         if in_file != out_file:
-            cmd = 'dem_error.py {f} -g {g} -t {t} -o {o} --update '.format(f=in_file,
+            dem_error_args = '{f} -g {g} -t {t} -o {o} --update '.format(f=in_file,
                                                                            g=geom_file,
                                                                            t=self.templateFile,
                                                                            o=out_file)
-            print(cmd)
-            status = subprocess.Popen(cmd, shell=True).wait()
+            print('dem_error.py ', dem_error_args)
+            pysar.dem_error.main(dem_error_args)
         else:
             print('No topographic residual correction.')
         return status
@@ -748,9 +739,9 @@ class TimeSeriesAnalysis:
         res_file = 'timeseriesResidual.h5'
         status = 0
         if os.path.isfile(res_file):
-            cmd = 'timeseries_rms.py {} -t {}'.format(res_file, self.templateFile)
-            print(cmd)
-            status = subprocess.Popen(cmd, shell=True).wait()
+            timeseries_rms_args = '{} -t {}'.format(res_file, self.templateFile)
+            print('timeseries_rms.py ', timeseries_rms_args)
+            pysar.timeseries_rms.main(timeseries_rms_args)
         else:
             print('No residual phase file found! Skip residual RMS analysis.')
         return status
@@ -761,11 +752,11 @@ class TimeSeriesAnalysis:
         status = 0
         if self.template['pysar.reference.date']:
             in_files = self.get_timeseries_filename(self.template)[step_name]['input']
-            cmd = 'reference_date.py -t {} '.format(self.templateFile)
+            reference_date_args = '-t {} '.format(self.templateFile)
             for in_file in in_files:
-                cmd += ' {}'.format(in_file)
-            print(cmd)
-            status = subprocess.Popen(cmd, shell=True).wait()
+                reference_date_args += ' {}'.format(in_file)
+            print('reference_date.py ', reference_date_args)
+            pysar.reference_date.main(reference_date_args)
         else:
             print('No reference date change.')
         return status
@@ -775,11 +766,11 @@ class TimeSeriesAnalysis:
         """Estimate average velocity from displacement time-series"""
         ts_file = self.get_timeseries_filename(self.template)[step_name]['input']
         vel_file = 'velocity.h5'
-        cmd = 'timeseries2velocity.py {f} -t {t} -o {o} --update'.format(f=ts_file,
+        timeseries2velocity_args = '{f} -t {t} -o {o} --update'.format(f=ts_file,
                                                                          t=self.templateFile,
                                                                          o=vel_file)
-        print(cmd)
-        status = subprocess.Popen(cmd, shell=True).wait()
+        print('timeseries2velocity.py ', timeseries2velocity_args)
+        pysar.timeseries2velocity.main(timeseries2velocity_args)
 
         # Velocity from estimated tropospheric delays
         tropo_model = self.template['pysar.troposphericDelay.weatherModel']
@@ -787,12 +778,11 @@ class TimeSeriesAnalysis:
         if os.path.isfile(tropo_file):
             suffix = os.path.splitext(os.path.basename(tropo_file))[0].title()
             tropo_vel_file = '{}{}.h5'.format(os.path.splitext(vel_file)[0], suffix)
-            cmd = 'timeseries2velocity.py {f} -t {t} -o {o} --update'.format(f=tropo_file,
+            timeseries2velocity_args= '{f} -t {t} -o {o} --update'.format(f=tropo_file,
                                                                              t=self.templateFile,
                                                                              o=tropo_vel_file)
-            print(cmd)
-            subprocess.Popen(cmd, shell=True).wait()
-        return status
+            print('timeseries2velocity.py ', timeseries2velocity_args)
+            pysar.timeseries2velocity.main(timeseries2velocity_args)
 
 
     def run_geocode(self, step_name):
@@ -826,10 +816,10 @@ class TimeSeriesAnalysis:
                 tcoh_file = os.path.join(out_dir, 'geo_temporalCoherence.h5')
                 mask_file = os.path.join(out_dir, 'geo_maskTempCoh.h5')
                 tcoh_min = self.template['pysar.networkInversion.minTempCoh']
-                cmd = 'generate_mask.py {} -m {} -o {} --shadow {}'.format(tcoh_file, tcoh_min, mask_file, geom_file)
-                print(cmd)
+                generate_mask_args = '{} -m {} -o {} --shadow {}'.format(tcoh_file, tcoh_min, mask_file, geom_file)
+                print('generate_mask.py ', generate_mask_args)
                 if ut.run_or_skip(out_file=mask_file, in_file=tcoh_file) == 'run':
-                    subprocess.Popen(cmd, shell=True).wait()
+                    pysar.generate_mask.main(generate_mask_args)
         else:
             print('geocoding is OFF')
         return status
@@ -848,8 +838,8 @@ class TimeSeriesAnalysis:
 
             # output
             kmz_file = '{}.kmz'.format(os.path.splitext(vel_file)[0])
-            cmd = 'save_kmz.py {} -o {}'.format(vel_file, kmz_file)
-            print(cmd)
+            save_kmz_args = '{} -o {}'.format(vel_file, kmz_file)
+            print('save_kmz.py ', save_kmz_args)
 
             # update mode
             try:
@@ -857,7 +847,7 @@ class TimeSeriesAnalysis:
             except:
                 kmz_file = None
             if ut.run_or_skip(out_file=kmz_file, in_file=vel_file, check_readable=False) == 'run':
-                status = subprocess.Popen(cmd, shell=True).wait()
+                pysar.save_kmz.main(save_kmz_args)
         else:
             print('save velocity to Google Earth format is OFF.')
         return status
@@ -883,12 +873,12 @@ class TimeSeriesAnalysis:
 
             # cmd
             print('--------------------------------------------')
-            cmd = 'save_hdfeos5.py {f} -c {c} -m {m} -g {g} -t {t}'.format(f=ts_file,
+            save_hdfeos5_args = '{f} -c {c} -m {m} -g {g} -t {t}'.format(f=ts_file,
                                                                            c=tcoh_file,
                                                                            m=mask_file,
                                                                            g=geom_file,
                                                                            t=self.templateFile)
-            print(cmd)
+            print('save_hdfeos5.py ', save_hdfeos5_args)
 
             # output (check existing file)
             atr = readfile.read_attribute(ts_file)
@@ -898,7 +888,7 @@ class TimeSeriesAnalysis:
             except:
                 hdfeos5_file = None
             if ut.run_or_skip(out_file=hdfeos5_file, in_file=[ts_file, tcoh_file, mask_file, geom_file]) == 'run':
-                status = subprocess.Popen(cmd, shell=True).wait()
+                pysar.save_hdfeos5.main(save_hdfeos5_args)
         else:
             print('save time-series to HDF-EOS5 format is OFF.')
         return status
