@@ -21,6 +21,7 @@ from pysar.objects import sensor, RAMP_LIST
 from pysar.utils import readfile, utils as ut
 from pysar.defaults.auto_path import autoPath
 from pysar import version
+from pysar import load_data
 
 
 ##########################################################################
@@ -323,14 +324,14 @@ class TimeSeriesAnalysis:
         self._copy_aux_file()
 
         # 2) loading data
-        cmd = 'load_data.py --template {}'.format(self.templateFile)
+        load_data_args = '--template {}'.format(self.templateFile)
         if self.customTemplateFile:
-            cmd += ' {}'.format(self.customTemplateFile)
+            load_data_args += ' {}'.format(self.customTemplateFile)
         if self.projectName:
-            cmd += ' --project {}'.format(self.projectName)
+            load_data_args += ' --project {}'.format(self.projectName)
         # run
-        print(cmd)
-        subprocess.Popen(cmd, shell=True).wait()
+        print(load_data_args)
+        load_data.main(load_data_args)
         os.chdir(self.workDir)
 
         # 3) check loading result
