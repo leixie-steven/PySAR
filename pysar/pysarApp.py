@@ -637,7 +637,6 @@ class TimeSeriesAnalysis:
 
     def run_tropospheric_delay_correction(self, step_name):
         """Correct tropospheric delays."""
-        status = 0
         geom_file = ut.check_loaded_dataset(self.workDir, print_msg=False)[2]
         mask_file = 'maskTempCoh.h5'
 
@@ -664,33 +663,25 @@ class TimeSeriesAnalysis:
 
             # Weather Re-analysis Data (Jolivet et al., 2011;2014)
             elif method == 'pyaps':
-                cmd = 'tropo_pyaps.py -f {f} --model {m} -g {g} -w {w}'.format(f=in_file,
+                tropo_pyaps_args = '-f {f} --model {m} -g {g} -w {w}'.format(f=in_file,
                                                                                m=tropo_model,
                                                                                g=geom_file,
                                                                                w=weather_dir)
                 print('Atmospheric correction using Weather Re-analysis dataset (PyAPS, Jolivet et al., 2011)')
                 print('Weather Re-analysis dataset:', tropo_model)
-                print(cmd)
+                print('tropo_pyaps.py ', tropo_pyaps_args)
                 if ut.run_or_skip(out_file=out_file, in_file=in_file) == 'run':
                     tropo_file = './INPUTS/{}.h5'.format(tropo_model)
                     if os.path.isfile(tropo_file):
-                        cmd = 'diff.py {f} {t} -o {o} --force'.format(f=in_file, t=tropo_file, o=out_file)
+                        diff_args = '{f} {t} -o {o} --force'.format(f=in_file, t=tropo_file, o=out_file)
                         print('--------------------------------------------')
                         print('Use existed tropospheric delay file: {}'.format(tropo_file))
-                        print(cmd)
-                    status = subprocess.Popen(cmd, shell=True).wait()
-                    if status is not 0:
-                        msg = '\nError in step: {} with {} method'.format(step_name, method)
-                        msg += '\nTry the following:'
-                        msg += '\n1) Check the installation of PyAPS'
-                        msg += '\n   http://earthdef.caltech.edu/projects/pyaps/wiki/Main'
-                        msg += '\n   Try in command line: python -c "import pyaps"'
-                        msg += '\n2) Use other tropospheric correction method, height-correlation, for example'
-                        msg += '\n3) or turn off the option by setting pysar.troposphericDelay.method = no.\n'
-                        print(msg)
+                        print('diff.py ', diff_args)
+                        pysar.diff.main(diff_args)
+                    else:
+                        pysar.tropo_pyaps.main(tropo_pyaps_args)
         else:
             print('No tropospheric delay correction.')
-        return status
 
 
     def run_phase_deramping(self, step_name):
