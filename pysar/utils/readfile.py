@@ -320,7 +320,7 @@ def read_binary_file(fname, datasetName=None, box=None):
         elif k in ['slc']:
             cpx_band = 'magnitude'
 
-        elif k in ['los'] and datasetName and datasetName.startswith(('az', 'head')):
+        elif k in ['los','los_crop'] and datasetName and datasetName.startswith(('az', 'head')):
             band = 2
 
         elif k in ['incLocal']:

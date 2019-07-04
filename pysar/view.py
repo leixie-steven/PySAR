@@ -1034,10 +1034,21 @@ def plot_figure(j, inps, metadata):
     for i in range(i_start, i_end):
         idx = i - i_start
         ax = fig.add_subplot(inps.fig_row_num, inps.fig_col_num, idx + 1)
+
         im = plot_subplot4figure(i, inps, ax=ax,
                                  data=data[idx, :, :],
                                  metadata=metadata)
         prog_bar.update(idx+1, suffix=inps.dset[i].split('/')[-1])
+        #lei
+        ############################################################
+        # plot interested points lei
+        if inps.pts_file and os.path.isfile(inps.pts_file):
+            iinps, atr = check_input_file_info(inps)
+            inps.lookup_file = ut.get_lookup_file('./INPUTS/geometryRadar.h5')
+            iinps.coord = ut.coordinate(atr, inps.lookup_file)
+            iinps = pp.read_point2inps(inps, inps.coord)
+            ax.scatter(iinps.pts_yx[:, 1][0], iinps.pts_yx[:, 0][0], s=75,c='r', marker='^',edgecolors='k',zorder=2)
+        ############################################################
     prog_bar.close()
     del data
 

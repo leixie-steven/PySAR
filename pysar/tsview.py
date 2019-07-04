@@ -587,6 +587,15 @@ class timeseriesViewer():
 
         # call view.py to plot
         self.img, self.cbar_img = view.plot_slice(self.ax_img, img_data, self.atr, self)[2:4]
+
+        ############################################################
+        # plot interested points lei
+        if self.pts_file and os.path.isfile(self.pts_file):
+            iinps = pp.read_point2inps(self, self.coord)
+            self.ax_img.plot(iinps.pts_lalo[:, 1], iinps.pts_lalo[:, 0],
+                             iinps.pts_marker, ms=iinps.pts_marker_size,
+                             markeredgecolor='k', markerfacecolor=None)
+        ############################################################
         return self.img, self.cbar_img
 
 
