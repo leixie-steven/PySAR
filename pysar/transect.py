@@ -280,7 +280,7 @@ def get_start_end_points(inps):
 def plot_transect_location(ax, inps):
     print('plot profile line in the 1st input file')
     data0, atr0 = readfile.read(inps.file[0])
-    ax.imshow(data0)
+    ax.imshow(data0,cmap='jet')
 
     coord = ut.coordinate(atr0)
     if inps.start_lalo and inps.end_lalo:
